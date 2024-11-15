@@ -19,17 +19,19 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
 parser.add_argument('--epsilon', default=0.031,
                     help='perturbation')
 parser.add_argument('--model-path',
-                    default='./checkpoints/model_cifar_wrn.pt',
+                    default='/model_cifar_wrn.pt',
                     help='model for white-box attack evaluation')
 parser.add_argument('--data-attak-path',
-                    default='./data_attack/cifar10_X_adv.npy',
+                    default='/data_attack/cifar10_X_adv.npy',
                     help='adversarial data for white-box attack evaluation')
 parser.add_argument('--data-path',
-                    default='./data_attack/cifar10_X.npy',
+                    default='/data_attack/cifar10_X.npy',
                     help='data for white-box attack evaluation')
 parser.add_argument('--target-path',
-                    default='./data_attack/cifar10_Y.npy',
+                    default='/data_attack/cifar10_Y.npy',
                     help='target for white-box attack evaluation')
+parser.add_argument('--benchmark-dir',
+                    default='/root/autodl-tmp/sunbing/workspace/uap/')
 
 args = parser.parse_args()
 
@@ -38,6 +40,13 @@ use_cuda = not args.no_cuda and torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
+model_folder = args.benchmark_dir + 'my_result/uap_virtual_data.pytorch/models/trades'
+data_dir = args.benchmark_dir + 'data/cifar10'
+
+model_path = model_folder + args.model_path
+data_attak_path = data_dir + args.data_attak_path
+data_path = data_dir + args.data_path
+target_path = data_dir + args.target_path
 
 def image_check(min_delta, max_delta, min_image_adv, max_image_adv):
     valid = 1.0
@@ -102,12 +111,12 @@ def main():
     # white-box attack
     # load model
     model = WideResNet().to(device)
-    model.load_state_dict(torch.load(args.model_path))
+    model.load_state_dict(torch.load(model_path))
 
     # load data
-    X_adv_data = np.load(args.data_attak_path)
-    X_data = np.load(args.data_path)
-    Y_data = np.load(args.target_path)
+    X_adv_data = np.load(data_attak_path)
+    X_data = np.load(data_path)
+    Y_data = np.load(target_path)
 
     eval_adv_test_whitebox(model, device, X_adv_data, X_data, Y_data)
 

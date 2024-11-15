@@ -82,3 +82,17 @@ def trades_loss(model,
                                                     F.softmax(model(x_natural), dim=1))
     loss = loss_natural + beta * loss_robust
     return loss
+
+
+def normal_loss(model,
+                x,
+                y,
+                optimizer):
+
+    model.train()
+    # zero gradient
+    optimizer.zero_grad()
+    # calculate robust loss
+    logits = model(x)
+    loss = F.cross_entropy(logits, y)
+    return loss
