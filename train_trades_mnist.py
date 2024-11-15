@@ -9,7 +9,7 @@ from torchvision import datasets, transforms
 
 from models.net_mnist import *
 from models.small_cnn import *
-from trades import trades_loss
+from trades import trades_loss, normal_loss
 
 
 parser = argparse.ArgumentParser(description='PyTorch MNIST TRADES Adversarial Training')
@@ -37,14 +37,21 @@ parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--log-interval', type=int, default=100, metavar='N',
                     help='how many batches to wait before logging training status')
-parser.add_argument('--model-dir', default='./model-mnist-smallCNN',
+parser.add_argument('--model-dir', default='/model-mnist-smallCNN',
                     help='directory of model for saving checkpoint')
 parser.add_argument('--save-freq', '-s', default=5, type=int, metavar='N',
                     help='save frequency')
+parser.add_argument('--advtrain', type=int, default=1,
+                    help='adversarial training (default: 1)')
+parser.add_argument('--benchmark-dir',
+                    default='/root/autodl-tmp/sunbing/workspace/uap/')
 args = parser.parse_args()
 
 # settings
-model_dir = args.model_dir
+model_folder = args.benchmark_dir + 'my_result/uap_virtual_data.pytorch/models/trades'
+
+model_dir = model_folder + args.model_dir
+
 if not os.path.exists(model_dir):
     os.makedirs(model_dir)
 use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -52,14 +59,16 @@ torch.manual_seed(args.seed)
 device = torch.device("cuda" if use_cuda else "cpu")
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
+data_dir = args.benchmark_dir + 'data/mnist'
+
 # setup data loader
 train_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('../data', train=True, download=True,
+    datasets.MNIST(data_dir + '/data', train=True, download=True,
                    transform=transforms.ToTensor()),
     batch_size=args.batch_size, shuffle=True, **kwargs)
 
 test_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('../data', train=False,
+    datasets.MNIST(data_dir + '/data', train=False,
                    transform=transforms.ToTensor()),
                    batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
@@ -72,15 +81,20 @@ def train(args, model, device, train_loader, optimizer, epoch):
         optimizer.zero_grad()
 
         # calculate robust loss
-        loss = trades_loss(model=model,
-                           x_natural=data,
-                           y=target,
-                           optimizer=optimizer,
-                           step_size=args.step_size,
-                           epsilon=args.epsilon,
-                           perturb_steps=args.num_steps,
-                           beta=args.beta)
-
+        if args.advtrain:
+            loss = trades_loss(model=model,
+                               x_natural=data,
+                               y=target,
+                               optimizer=optimizer,
+                               step_size=args.step_size,
+                               epsilon=args.epsilon,
+                               perturb_steps=args.num_steps,
+                               beta=args.beta)
+        else:
+            loss = normal_loss(model=model,
+                               x=data,
+                               y=target,
+                               optimizer=optimizer)
         loss.backward()
         optimizer.step()
 
@@ -164,9 +178,11 @@ def main():
         if epoch % args.save_freq == 0:
             torch.save(model.state_dict(),
                        os.path.join(model_dir, 'model-nn-epoch{}.pt'.format(epoch)))
-            torch.save(optimizer.state_dict(),
-                       os.path.join(model_dir, 'opt-nn-checkpoint_epoch{}.tar'.format(epoch)))
+            #torch.save(optimizer.state_dict(),
+            #           os.path.join(model_dir, 'opt-nn-checkpoint_epoch{}.tar'.format(epoch)))
 
+    torch.save(model.state_dict(),
+               os.path.join(model_dir, 'model-nn-epoch{}.pt'.format(epoch)))
 
 if __name__ == '__main__':
     main()
